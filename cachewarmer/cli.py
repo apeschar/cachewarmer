@@ -1,4 +1,5 @@
 import sys
+import time
 from argparse import ArgumentParser
 
 import requests
@@ -11,6 +12,7 @@ def main():
     parser.add_argument('--url', '-u', required=True)
     parser.add_argument('--max-depth', '-d', type=int, default=2)
     parser.add_argument('--exclude', '-e', action='append')
+    parser.add_argument('--delay', '-D', type=float, default=0)
     args = parser.parse_args()
 
     ignored = set()
@@ -19,14 +21,18 @@ def main():
         session = requests.Session()
         seen = set()
         queue = [Request(args.url, depth=0)]
+        start_time = None
         while queue:
             request = queue.pop(0)
             if request.url in ignored or request.url in seen:
                 continue
             if request.depth > args.max_depth:
                 continue
-            print('[%d] %s' % (request.depth, request.url), file=sys.stderr)
             seen.add(request.url)
+            if start_time is not None:
+                time.sleep(max(0, start_time + args.delay - time.monotonic()))
+            start_time = time.monotonic()
+            print('[%d] %s' % (request.depth, request.url), file=sys.stderr)
             with session.get(request.url, headers={
                 'User-Agent': 'Mozilla/5.0 (compatible; bingbot/2.0; +http://www.bing.com/bingbot.htm)',
             }, stream=True) as resp:
