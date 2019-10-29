@@ -36,19 +36,24 @@ def main():
                 'User-Agent': 'Mozilla/5.0 (compatible; bingbot/2.0; +http://www.bing.com/bingbot.htm)',
             }, stream=True) as resp:
                 hit = 'HIT' in resp.headers.get('x-cache', '')
-                print('[%d] %s %s' % (request.depth, 'HIT' if hit else 'MISS', request.url), file=sys.stderr)
+                log('[%d] %s %s' % (request.depth, 'HIT' if hit else 'MISS', request.url))
                 if len(resp.text) > 1024**2:
-                    print("Response is too large, ignoring:", request.url)
+                    log("Response is too large, ignoring:", request.url)
                     ignored.add(request.url)
                     continue
                 if not is_cachable(resp):
-                    print("Page is not cachable, ignoring:", request.url)
+                    log("Page is not cachable, ignoring:", request.url)
                     ignored.add(request.url)
                 root = etree.HTML(resp.text)
             for link in links(root, resp.url):
                 if is_excluded(args.exclude, link):
                     continue
                 queue.append(Request(link, depth=request.depth + 1))
+
+
+def log(*args):
+    print(*args, file=sys.stderr)
+    sys.stderr.flush()
 
 
 def links(root, base_url):
