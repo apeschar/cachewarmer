@@ -10,6 +10,7 @@ def main():
     parser = ArgumentParser()
     parser.add_argument('--url', '-u', required=True)
     parser.add_argument('--max-depth', '-d', type=int, default=2)
+    parser.add_argument('--exclude', '-e', action='append')
     args = parser.parse_args()
 
     ignored = set()
@@ -20,20 +21,27 @@ def main():
         queue = [Request(args.url, depth=0)]
         while queue:
             request = queue.pop(0)
+            if request.url in ignored or request.url in seen:
+                continue
+            if request.depth > args.max_depth:
+                continue
             print('[%d] %s' % (request.depth, request.url), file=sys.stderr)
             seen.add(request.url)
-            resp = session.get(request.url, headers={
-                'User-Agent': 'Mozilla/5.0 (X11; Fedora; Linux x86_64; rv:70.0) Gecko/20100101 Firefox/70.0',
-            })
-            if not is_cachable(resp):
-                print("Page is not cachable, ignoring:", request.url)
-                ignored.add(request.url)
-            root = etree.HTML(resp.text)
-            for link in links(root, resp.url):
-                if link in ignored or link in seen:
+            with session.get(request.url, headers={
+                'User-Agent': 'Mozilla/5.0 (compatible; bingbot/2.0; +http://www.bing.com/bingbot.htm)',
+            }, stream=True) as resp:
+                if len(resp.text) > 1024**2:
+                    print("Response is too large, ignoring:", request.url)
+                    ignored.add(request.url)
                     continue
-                if request.depth < args.max_depth:
-                    queue.append(Request(link, depth=request.depth + 1))
+                if not is_cachable(resp):
+                    print("Page is not cachable, ignoring:", request.url)
+                    ignored.add(request.url)
+                root = etree.HTML(resp.text)
+            for link in links(root, resp.url):
+                if is_excluded(args.exclude, link):
+                    continue
+                queue.append(Request(link, depth=request.depth + 1))
 
 
 def links(root, base_url):
@@ -54,6 +62,13 @@ def is_cachable(resp):
     return 'no-cache' not in cache_control
 
 
+def is_excluded(patterns, url):
+    for pattern in patterns:
+        if pattern in url:
+            return True
+    return False
+
+
 class Request:
 
     def __init__(self, url, *, depth):
@@ -62,4 +77,8 @@ class Request:
 
 
 if __name__ == '__main__':
-    main()
+    try:
+        main()
+    except KeyboardInterrupt:
+        print("Interrupt", file=sys.stderr)
+        sys.exit(1)
