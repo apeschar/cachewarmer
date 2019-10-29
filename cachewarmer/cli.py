@@ -32,10 +32,11 @@ def main():
             if start_time is not None:
                 time.sleep(max(0, start_time + args.delay - time.monotonic()))
             start_time = time.monotonic()
-            print('[%d] %s' % (request.depth, request.url), file=sys.stderr)
             with session.get(request.url, headers={
                 'User-Agent': 'Mozilla/5.0 (compatible; bingbot/2.0; +http://www.bing.com/bingbot.htm)',
             }, stream=True) as resp:
+                hit = 'HIT' in resp.headers.get('x-cache', '')
+                print('[%d] %s %s' % (request.depth, 'HIT' if hit else 'MISS', request.url), file=sys.stderr)
                 if len(resp.text) > 1024**2:
                     print("Response is too large, ignoring:", request.url)
                     ignored.add(request.url)
