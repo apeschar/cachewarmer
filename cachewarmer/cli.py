@@ -18,6 +18,8 @@ def main():
     ignored = set()
 
     while True:
+        if ignored:
+            ignored.pop()
         session = requests.Session()
         seen = set()
         queue = [Request(args.url, depth=0)]
@@ -44,6 +46,7 @@ def main():
                 if not is_cachable(resp):
                     log("Page is not cachable, ignoring:", request.url)
                     ignored.add(request.url)
+                    continue
                 root = etree.HTML(resp.text)
             for link in links(root, resp.url):
                 if is_excluded(args.exclude, link):
